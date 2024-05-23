@@ -4,7 +4,7 @@ Repository for the replication of the paper [How to Fix a Broken Confidence Esti
 
 ## MaxLogit-pNorm
 
-From a vector $\mathbf{z} of logits with $C$ classes, the MaxLogit-pNorm is defined as:
+From a vector $\mathbf{z}$ of logits with $C$ classes, the MaxLogit-pNorm is defined as:
 
 $$\text{MaxLogit-pNorm}(\mathbf{z}) := \max_{k} \frac{z_k-\mu(\mathbf{z})}{||\mathbf{z}-\mu(\mathbf{z})||_p}$$
 
