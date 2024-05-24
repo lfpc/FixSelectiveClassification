@@ -75,6 +75,7 @@ def get_model(MODEL_ARC:str, pretrained:bool = True, return_transforms:bool = Tr
     elif MODEL_ARC in timm.list_models():
         transforms = timm.data.create_transform(**timm.data.resolve_data_config(timm.get_pretrained_cfg(MODEL_ARC).__dict__))
         model = timm.create_model(MODEL_ARC,pretrained)
+    else: raise ValueError('Model not found.')
     
     if return_transforms: return model,transforms
     else: return model

@@ -5,6 +5,8 @@ from models import get_model
 from torchvision import datasets
 from torch.utils.data import Subset, Dataset,random_split, DataLoader
 
+MODELS_DIR = join(r'/home/luis-felipe','torch_models')
+
 def accumulate_results(model,data, set_eval = False):
     '''Accumulate output (of model) and label of a entire dataset.'''
 
@@ -26,9 +28,9 @@ def accumulate_results(model,data, set_eval = False):
         
     return output_list,label_list
 
-def get_dataloader(DATA:str, split = 'test', batch_size = 100, data_dir = r'/data', transforms = None,subset = False, 
+def get_dataloader(data:str, split = 'test', batch_size = 100, data_dir = r'/data', transforms = None,subset = False, 
                    num_workers:int = 4):
-    if DATA.lower() == 'imagenet':
+    if data.lower() == 'imagenet':
         if exists(join(data_dir,'ImageNet')): data_dir = join(data_dir,'ImageNet')
         if 'corrupted' in split:
             if isinstance(split, tuple): split = join(split[0],split[1],split[2])
@@ -37,49 +39,54 @@ def get_dataloader(DATA:str, split = 'test', batch_size = 100, data_dir = r'/dat
         dataset = datasets.imagenet.ImageFolder(join(data_dir,split),transform=transforms)
         #dataset = datasets.imagenet.ImageNet(data_dir,split = split,transform = transforms)
         
-    elif DATA.lower() == 'cifar100':
+    elif data.lower() == 'cifar100':
         dataset = datasets.CIFAR100(root=data_dir,
                                     train=(split=='train'),
                                     download=True,
                                     transform=transforms)
-    elif DATA.lower() == 'places365':
-        dataset = datasets.Places365(root=join(data_dir,'Places365'),
-                                    split = split,
-                                    small=True,
-                                    transform=transforms)
-    elif DATA.lower() == 'oxfordiiitpet':
+    elif data.lower() == 'oxfordiiitpet':
         dataset = datasets.OxfordIIITPet(root=join(data_dir),
                                     split = 'test' if split=='test' else 'trainval',
                                     download=True,
                                     transform=transforms)
-    elif DATA.lower() == 'dermnet':
-        dataset = datasets.ImageFolder(join(data_dir,DATA,split), transform=transforms)
+    elif data.lower() == 'dermnet':
+        dataset = datasets.ImageFolder(join(data_dir,data,split), transform=transforms)
     if subset:
         dataset = split_data(subset, len(dataset)).dataset(dataset)[1]
     return DataLoader(dataset,batch_size=batch_size, num_workers=num_workers)
 
 
-def calc_logits(model_arc:str,DATA:str = 'ImageNet',models_dir= r'/models', 
-                  split = 'test', device = torch.device('cuda'), **kwargs_data):
-    classifier,transforms = get_model(model_arc,DATA,True,True,join(models_dir))
+def calc_logits(model_arc:str,data:str = 'ImageNet',models_dir= MODELS_DIR, 
+                  split = 'val', device = torch.device('cuda'), **kwargs_data):
+    classifier,transforms = get_model(model_arc,data,True,True,join(models_dir))
     classifier = classifier.to(device).eval()
-    dataloader = get_dataloader(DATA,split,transforms = transforms,**kwargs_data)
-    outputs,labels =  accumulate_results(classifier,dataloader)
-    if isinstance(split,tuple): split = '_'.join(split)
-    torch.save(outputs, join(models_dir,'outputs',f'{model_arc}_{DATA}_outputs_{split}.pt'))
-    torch.save(labels,join(models_dir,'outputs',f'{DATA}_labels_{split}.pt'))
-    return outputs.to(torch.get_default_dtype()),labels
+    dataloader = get_dataloader(data,split,transforms = transforms,**kwargs_data)
+    logits,labels =  accumulate_results(classifier,dataloader)
+    models_dir = join(models_dir,data)
+    if isinstance(split,tuple): 
+        models_dir = join(models_dir,split[0])
+        split = '_'.join(split)
+    else: models_dir = join(models_dir,split)
 
-def upload_logits(model_arc:str,DATA:str = 'ImageNet',models_dir= r'/models', 
-                  split = 'test', device = torch.device('cuda'), **kwargs_data):
-    models_dir = join(models_dir,DATA)
-    if isinstance(split,tuple): split_str = '_'.join(split)
-    else: split_str = split
-    if f'{model_arc}_{DATA}_outputs_{split_str}.pt' in listdir(join(models_dir,'outputs')):
-        outputs = torch.load(join(models_dir,'outputs',f'{model_arc}_{DATA}_outputs_{split_str}.pt')).to(device)
-        labels = torch.load(join(models_dir,'outputs',f'{DATA}_labels_{split_str}.pt')).to(device)
-        return outputs.to(torch.get_default_dtype()),labels
-    else: return calc_logits(model_arc, DATA, models_dir,split, device,**kwargs_data)
+    torch.save(logits, join(models_dir,'logits',f'{model_arc}_{data}_{split}_logits.pt'))
+    torch.save(labels,join(models_dir,'labels',f'{data}_{split}_labels.pt'))
+    return logits.to(torch.get_default_dtype()),labels
+
+def upload_logits(model_arc:str,data:str = 'ImageNet',models_dir= MODELS_DIR, 
+                  split = 'val', device = torch.device('cuda'), 
+                  **kwargs_data):
+    if split == 'test': split = 'val'
+    if isinstance(split,tuple): 
+        split_str = '_'.join(split)
+        split_folder = split[0]
+    else: 
+        split_str = split
+        split_folder = split
+    if f'{model_arc}_{data}_{split_str}_logits.pt' in listdir(join(models_dir,data,split_folder,'logits')):
+        logits = torch.load(join(models_dir,data,split_folder,'logits',f'{model_arc}_{data}_{split_str}_logits.pt')).to(device)
+        labels = torch.load(join(models_dir,data,split_folder,'labels',f'{data}_{split_str}_labels.pt')).to(device)
+        return logits.to(torch.get_default_dtype()),labels
+    else: return calc_logits(model_arc, data, models_dir,split, device,**kwargs_data)
         
 
 class split_data():
@@ -89,21 +96,39 @@ class split_data():
         assert validation_size <= n
         self.val_index = torch.randperm(n,generator = torch.Generator().manual_seed(seed))[:int(validation_size)]
         self.test_index = torch.randperm(n,generator = torch.Generator().manual_seed(seed))[int(validation_size):]
-    def logits(self,outputs,labels):
-        outputs_val,labels_val = outputs[self.val_index],labels[self.val_index]
-        outputs_test,labels_test = outputs[self.test_index],labels[self.test_index]
-        return outputs_val,labels_val,outputs_test,labels_test 
+    def logits(self,logits,labels):
+        logits_val,labels_val = logits[self.val_index],labels[self.val_index]
+        logits_test,labels_test = logits[self.test_index],labels[self.test_index]
+        return logits_val,labels_val,logits_test,labels_test 
     def dataset(self,dataset):
         return Subset(dataset,self.test_index), Subset(dataset,self.val_index)
     @staticmethod
-    def split_logits(outputs,labels,validation_size = 0.1,seed:int = 42):
+    def split_logits(logits,labels,validation_size = 0.1,seed:int = 42):
         n = labels.size(0)
         val_index = torch.randperm(n,generator = torch.Generator().manual_seed(seed))[:int(validation_size*n)]
         test_index = torch.randperm(n,generator = torch.Generator().manual_seed(seed))[int(validation_size*n):]
-        outputs_val,labels_val = outputs[val_index],labels[val_index]
-        outputs_test,labels_test = outputs[test_index],labels[test_index]
-        return outputs_val,labels_val,outputs_test,labels_test
+        logits_val,labels_val = logits[val_index],labels[val_index]
+        logits_test,labels_test = logits[test_index],labels[test_index]
+        return logits_val,labels_val,logits_test,labels_test
     @staticmethod
     def split_dataset(dataset,validation_size:float = 0.1, seed:int = 42):
         return random_split(dataset, [1-validation_size, validation_size], generator = torch.Generator().manual_seed(seed))
+    @staticmethod
+    def split_logits_balanced(logits:torch.tensor,labels:torch.tensor,validation_size:float, seed = 42):
+        unique,  num = torch.unique(labels,return_counts=True)
+        labels_val = []
+        logits_val = []
+        labels_test = []
+        logits_test = []
+        for i,l in enumerate(unique):
+            n = int(num[i]*validation_size)
+            index_val = torch.randperm(num[i],generator = torch.Generator().manual_seed(seed))[:n]
+            index_test = torch.randperm(num[i],generator = torch.Generator().manual_seed(seed))[n:]
+            labels_i = labels[labels==l.item()]
+            logits_i = logits[labels==l.item()]
+            labels_val.append(labels_i[index_val])
+            labels_test.append(labels_i[index_test])
+            logits_val.append(logits_i[index_val])
+            logits_test.append(logits_i[index_test])
+        return torch.cat(logits_val),torch.cat(labels_val),torch.cat(logits_test),torch.cat(labels_test)
     

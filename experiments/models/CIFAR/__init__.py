@@ -23,6 +23,8 @@ from torchvision import transforms as torch_transforms
 from os.path import join
 from os import listdir
 
+MODELS_DIR = join(r'/home/luis-felipe','torch_models','Cifar100')
+
 MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
 STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
 
@@ -37,7 +39,7 @@ def list_models():
         'ShuffleNetV2','VGG_11','VGG_13','VGG_16','VGG_19','WideResNet28_10']
 
 def get_model(MODEL_ARC:str, pretrained:bool = True, 
-              return_transforms:bool = True, weights_path = ''):
+              return_transforms:bool = True, weights_path = MODELS_DIR):
     
     model = globals()[MODEL_ARC](num_classes=100)
     transforms =  torch_transforms.Compose([

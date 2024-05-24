@@ -2,9 +2,7 @@ from .CIFAR import list_models as list_models_cifar
 from .CIFAR import get_model as get_model_cifar
 from .ImageNet import list_models as list_models_imagenet
 from .ImageNet import get_model as get_model_imagenet
-from .Places365 import get_model as get_model_places365
 from .OxfordPets import get_model as get_model_oxfordpets
-from .DermNet import get_model as get_model_dermnet
 
 def list_models(data:str = 'ImageNet'):
     if data.lower() == 'imagenet':
@@ -19,9 +17,5 @@ def get_model(MODEL_ARC:str,data:str = 'ImageNet',pretrained = True,
         return get_model_imagenet(MODEL_ARC,pretrained,return_transforms)
     elif data.lower() == 'cifar100':
         return get_model_cifar(MODEL_ARC,pretrained,return_transforms, weights_path)
-    elif data.lower() == 'places365':
-        return get_model_places365(MODEL_ARC,weights_path,pretrained,return_transforms)
     elif data.lower() == 'oxfordiiitpet':
         return get_model_oxfordpets(MODEL_ARC,weights_path,pretrained,return_transforms)
-    elif data.lower() == 'dermnet':
-        return get_model_dermnet(MODEL_ARC, weights_path,pretrained,return_transforms)

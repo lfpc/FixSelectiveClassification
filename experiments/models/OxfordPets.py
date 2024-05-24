@@ -4,7 +4,7 @@ import os
 import torch
 from .ImageNet import get_model as get_model_imagenet
 
-def_path = os.path.join(r'/home','luis-felipe','torch_models','OxfordIIITPet')
+MODELS_DIR = os.path.join(r'/home','luis-felipe','torch_models','OxfordIIITPet')
 
 def fine_tune_model(model, freeze:bool = False, PRE_TRAINED = True):
     name,classifier = list(model.named_children())[-1]
@@ -23,12 +23,12 @@ def fine_tune_model(model, freeze:bool = False, PRE_TRAINED = True):
             param.requires_grad = True
     return model
 
-def get_weight(MODEL_ARC:str, path=def_path):
-    return torch.load(os.path.join(path,MODEL_ARC,f'{MODEL_ARC}_OxfordIIITPet.pt'))
+def get_weight(MODEL_ARC:str, weights_path=MODELS_DIR):
+    return torch.load(os.path.join(weights_path,MODEL_ARC,f'{MODEL_ARC}_OxfordIIITPet.pt'))
 
-def get_model(MODEL_ARC:str,path=def_path, pretrained:bool = True, return_transforms:bool = True):
+def get_model(MODEL_ARC:str, weights_path = MODELS_DIR, pretrained:bool = True, return_transforms:bool = True):
     if pretrained:
-        weights = get_weight(MODEL_ARC,path)
+        weights = get_weight(MODEL_ARC,weights_path)
     else: 
         weights = None
     model,transforms_test = get_model_imagenet(MODEL_ARC,True,True)
