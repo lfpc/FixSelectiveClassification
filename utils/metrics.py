@@ -47,7 +47,7 @@ def coverages_from_t(g:torch.tensor,t):
 
 
 def SAC(confidence:torch.tensor,risk:torch.tensor,accuracy):
-    coverages,risk = RC_curve(risk,confidence)
+    coverages,risk = RC_curve(confidence,risk)
     risk = 1-risk #accuracy
     coverages = coverages[risk>=accuracy]
     if coverages.size>0: return coverages[-1]
